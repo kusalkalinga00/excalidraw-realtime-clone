@@ -18,7 +18,22 @@ const useBufferedWebSocket = (id: string) => {
         console.log("WebSocket connected");
       };
     }
+
+    return () => {
+      if (socket) {
+        socket.close();
+        console.log("WebSocket disconnected");
+      }
+    };
   }, []);
+
+  const sendEvent = (event: any) => {
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify(event));
+    }
+  };
+
+  return { sendEvent };
 };
 
 export default useBufferedWebSocket;
