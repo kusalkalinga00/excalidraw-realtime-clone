@@ -39,11 +39,11 @@ export class ExcalidrawWebSocketServer extends DurableObject {
       `[Durable Object] message: ${message}, from: ${session.id}, to: the initiating client. Total connectionss: ${this.sessions.size}`
     );
 
-    this.sessions.forEach((attachment, connectedWs) => {
-      connectedWs.send(
-        `[Durable Object] message: ${message}, from: ${session.id}, to: all clients. Total connections: ${this.sessions.size}`
-      );
-    });
+    // this.sessions.forEach((attachment, connectedWs) => {
+    //   connectedWs.send(
+    //     `[Durable Object] message: ${message}, from: ${session.id}, to: all clients. Total connections: ${this.sessions.size}`
+    //   );
+    // });
   }
 
   async webSocketClose(
