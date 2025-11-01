@@ -33,7 +33,7 @@ const useBufferedWebSocket = (id: string) => {
     }
   };
 
-  return { sendEvent };
+  return sendEvent;
 };
 
 export default useBufferedWebSocket;

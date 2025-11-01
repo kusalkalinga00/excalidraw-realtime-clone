@@ -1,13 +1,12 @@
-import "./App.css";
 import { Excalidraw } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 
-function App() {
+const ExcalidrawComponent = () => {
   return (
     <div style={{ height: "100vh", width: "100%" }}>
       <Excalidraw />
     </div>
   );
-}
+};
 
-export default App;
+export default ExcalidrawComponent;
