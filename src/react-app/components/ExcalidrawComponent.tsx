@@ -1,4 +1,4 @@
-import { Excalidraw } from "@excalidraw/excalidraw";
+import { Excalidraw, LiveCollaborationTrigger } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import useBufferedWebSocket from "../hooks/socket";
 import { useParams } from "@tanstack/react-router";
@@ -10,8 +10,10 @@ import {
 import {
   BufferEventType,
   ExcalidrawElementChange,
+  ExcalidrawElementChangeSchema,
   PointerEvent,
-} from "../types/event.schema";
+  PointerEventSchema,
+} from "../../types/event.schema";
 
 const ExcalidrawComponent = () => {
   const [excalidrawAPI, setExcalidrawAPI] =
@@ -52,8 +54,9 @@ const ExcalidrawComponent = () => {
         pointer: {
           x: event.data.x,
           y: event.data.y,
-          tool: "laser",
+          tool: "pointer",
         },
+        username: event.data.userId,
       });
       if (userId) {
         collaborator.delete(userId as SocketId);
@@ -73,7 +76,31 @@ const ExcalidrawComponent = () => {
 
   return (
     <div style={{ height: "100vh", width: "100%" }}>
-      <Excalidraw onPointerUpdate={(payload) => {}} />
+      <Excalidraw
+        onPointerUpdate={(payload) => {
+          sendEventViaSocket(
+            PointerEventSchema.parse({
+              type: "pointer",
+              data: {
+                userId: userId,
+                x: payload.pointer.x,
+                y: payload.pointer.y,
+              },
+            })
+          );
+        }}
+        onPointerUp={() => {
+          if (excalidrawAPI) {
+            sendEventViaSocket(
+              ExcalidrawElementChangeSchema.parse({
+                type: "elementChange",
+                data: excalidrawAPI.getSceneElements(),
+              })
+            );
+          }
+        }}
+        excalidrawAPI={(api) => setExcalidrawAPI(api)}
+      />
     </div>
   );
 };

@@ -1,22 +1,17 @@
 import { DurableObject } from "cloudflare:workers";
+import {
+  BufferEvent,
+  ExcalidrawElementChangeSchema,
+} from "../types/event.schema";
 
 export class ExcalidrawWebSocketServer extends DurableObject {
-  sessions: Map<WebSocket, { [key: string]: string }>;
+  elements: any[] = [];
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    this.sessions = new Map();
-
-    this.ctx.getWebSockets().forEach((ws) => {
-      let attachment = ws.deserializeAttachment();
-      if (attachment) {
-        this.sessions.set(ws, { ...attachment });
-      }
+    ctx.blockConcurrencyWhile(async () => {
+      this.elements = (await ctx.storage.get("elements")) || [];
     });
-
-    this.ctx.setWebSocketAutoResponse(
-      new WebSocketRequestResponsePair("ping", "pong")
-    );
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -25,37 +20,51 @@ export class ExcalidrawWebSocketServer extends DurableObject {
 
     this.ctx.acceptWebSocket(server);
 
-    const id = crypto.randomUUID();
-    server.serializeAttachment({ id });
-    this.sessions.set(server, { id });
-
     return new Response(null, { status: 101, webSocket: client });
   }
 
   async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
-    const session = this.sessions.get(ws)!;
+    if (message === "setup") {
+      ws.send(
+        JSON.stringify(
+          ExcalidrawElementChangeSchema.parse({
+            type: "elementChange",
+            data: this.elements,
+          })
+        )
+      );
+      return;
+    }
 
-    this.sessions.forEach((attachment, connectedWs) => {
-      if (connectedWs !== ws) {
-        connectedWs.send(
-          `[Durable Object] message: ${message}, from: ${session.id}, to: all clients except the initiating client. Total connections: ${this.sessions.size}`
-        );
+    this.broadcastMsg(ws, message);
+  }
+
+  webSocketClose(ws: WebSocket) {
+    console.log("WebSocket closed");
+  }
+
+  webSocketError(ws: WebSocket, error: unknown): void | Promise<void> {
+    console.log("Error:", error);
+  }
+
+  broadcastMsg(ws: WebSocket, message: string | ArrayBuffer) {
+    for (const session of this.ctx.getWebSockets()) {
+      if (session !== ws) {
+        session.send(message);
       }
-    });
+    }
+    if (typeof message === "string") {
+      const event = BufferEvent.parse(JSON.parse(message));
+      if (event.type === "elementChange") {
+        this.elements = event.data;
+        this.ctx.storage.put("elements", this.elements);
+      }
+    }
   }
 
-  async webSocketClose(
-    ws: WebSocket,
-    code: number,
-    reason: string,
-    wasClean: boolean
-  ) {
-    // this.sessions.delete(ws);
-    this.sessions.delete(ws);
-    ws.close(code, "Durable Object is closing WebSocket");
+  async getElements() {
+    return {
+      data: this.elements,
+    };
   }
-
-  // async webSocketError(ws: WebSocket, error: Error): Promise<void> {}
-
-  // async webSocketOpen(ws: WebSocket): Promise<void> {}
 }
