@@ -1,90 +1,162 @@
-# React + Vite + Hono + Cloudflare Workers
+# Excalidraw Realtime Clone (React + Hono + Cloudflare Workers)
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/templates/tree/main/vite-react-template)
+![App screenshot](./screen-shot.png)
 
-This template provides a minimal setup for building a React application with TypeScript and Vite, designed to run on Cloudflare Workers. It features hot module replacement, ESLint integration, and the flexibility of Workers deployments.
+## Overview
 
-![React + TypeScript + Vite + Cloudflare Workers](https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/fc7b4b62-442b-4769-641b-ad4422d74300/public)
+This project is a lightweight, production‑grade example of a collaborative whiteboard built on top of Excalidraw with true realtime sync. It uses Cloudflare Workers and Durable Objects to host a stateful WebSocket server per “room,” and a React SPA for the client UI. Each drawing room is identified by `:drawId` and maps to a single Durable Object instance that maintains the canonical scene and broadcasts live updates to connected clients.
 
-<!-- dash-content-start -->
+Use this as a reference for building low‑latency, globally available realtime apps (whiteboards, multiplayer canvases, cursors, and shared documents) without running your own servers.
 
-🚀 Supercharge your web development with this powerful stack:
+## Key features
 
-- [**React**](https://react.dev/) - A modern UI library for building interactive interfaces
-- [**Vite**](https://vite.dev/) - Lightning-fast build tooling and development server
-- [**Hono**](https://hono.dev/) - Ultralight, modern backend framework
-- [**Cloudflare Workers**](https://developers.cloudflare.com/workers/) - Edge computing platform for global deployment
+- Realtime collaboration over WebSockets (live cursors and scene updates)
+- Room-per-drawing via Durable Objects (`idFromName(drawId)`) for isolated state
+- Initial state sync on connect from DO storage ("cold start" resume)
+- Client‑side event buffering (10ms) to reduce network chatter
+- SPA routing with URL rooms: `/excalidraw/:drawId`
+- Type‑safe message contracts with Zod
 
-### ✨ Key Features
+## Architecture
 
-- 🔥 Hot Module Replacement (HMR) for rapid development
-- 📦 TypeScript support out of the box
-- 🛠️ ESLint configuration included
-- ⚡ Zero-config deployment to Cloudflare's global network
-- 🎯 API routes with Hono's elegant routing
-- 🔄 Full-stack development setup
-- 🔎 Built-in Observability to monitor your Worker
+- Client: React app (Vite + TanStack Router) renders Excalidraw and opens a WebSocket to `/api/ws/:drawingId`.
+- Edge runtime: Cloudflare Worker (Hono) upgrades the request and forwards it to a Durable Object instance identified by `drawingId`.
+- Durable Object: Holds the authoritative scene (array of elements), broadcasts messages to all connected sockets, and persists element changes to DO storage.
 
-Get started in minutes with local development or deploy directly via the Cloudflare dashboard. Perfect for building modern, performant web applications at the edge.
+Request/flow
 
-<!-- dash-content-end -->
+1. Client connects → sends a `"setup"` message.
+2. Durable Object responds with the current scene `{ type: "elementChange", data: [...] }`.
+3. Clients send two kinds of events:
+   - `pointer` (live cursor), not persisted; broadcast only.
+   - `elementChange` (scene elements), persisted and broadcast.
 
-## Getting Started
+## Tech stack
 
-To start a new project with this template, run:
+- React 19, Vite 6, TanStack Router 1.x
+- Excalidraw UI (`@excalidraw/excalidraw`)
+- Hono (HTTP router) on Cloudflare Workers
+- Cloudflare Durable Objects for stateful, per‑room coordination
+- Zod for runtime validation of socket messages
+
+## Project structure (high‑level)
+
+- `src/react-app/components/ExcalidrawComponent.tsx` – Canvas UI, socket integration, scene updates
+- `src/react-app/hooks/socket.tsx` – Buffered WebSocket client (`ws://localhost:5173/api/ws/:id` in dev)
+- `src/react-app/routes/excalidraw/$drawId.tsx` – Route that provides the `drawId` room param
+- `src/types/event.schema.ts` – Zod schemas and TypeScript types for socket payloads
+- `src/worker/index.ts` – Hono app and `/api/ws/:drawingId` upgrade endpoint
+- `src/worker/durable-object.ts` – `ExcalidrawWebSocketServer` DO: broadcast + persistence
+- `wrangler.json` – Worker, Durable Object binding and assets config
+- `vite.config.ts` – Vite + Cloudflare + TanStack Router plugins
+
+## How it works (contract)
+
+Messages
+
+- Pointer event
+  - Shape: `{ type: "pointer", data: { userId: string, x: number, y: number } }`
+  - Behavior: broadcast to all clients in the room; not stored.
+- Element change
+  - Shape: `{ type: "elementChange", data: any[] }` (Excalidraw elements array)
+  - Behavior: stored in DO storage under the room, and broadcast.
+
+On connect
+
+- Client sends `"setup"` → DO replies with `{ type: "elementChange", data: <persisted elements> }` so the canvas hydrates immediately.
+
+Buffering
+
+- The client buffers frequent events for ~10ms and flushes them together to lower socket pressure. Pointer events are keyed by user, element changes by a fixed key (latest wins per tick).
+
+## Getting started
+
+Prerequisites
+
+- Bun 1.0+ installed
+- A Cloudflare account for deployment
+
+Install
 
 ```bash
-npm create cloudflare@latest -- --template=cloudflare/templates/vite-react-template
+bun install
 ```
 
-A live deployment of this template is available at:
-[https://react-vite-template.templates.workers.dev](https://react-vite-template.templates.workers.dev)
-
-## Development
-
-Install dependencies:
+Run locally
 
 ```bash
-npm install
+bun run dev
 ```
 
-Start the development server with:
+Then open: http://localhost:5173/excalidraw/my-room-id
+
+Open the same URL in a second tab or device to see realtime collaboration.
+
+Build & preview (production bundle)
 
 ```bash
-npm run dev
+bun run build
+bun run preview
 ```
 
-Your application will be available at [http://localhost:5173](http://localhost:5173).
-
-## Production
-
-Build your project for production:
+Quality checks
 
 ```bash
-npm run build
+bun run lint      # eslint
+bun run check     # typecheck + build + wrangler dry-run
 ```
 
-Preview your build locally:
+## Deploy to Cloudflare
+
+This project ships with `wrangler` configured locally.
 
 ```bash
-npm run preview
+bun run deploy
 ```
 
-Deploy your project to Cloudflare Workers:
+Notes
 
-```bash
-npm run build && npm run deploy
+- The Durable Object is bound as `DURABLE_OBJECT` and class `ExcalidrawWebSocketServer`.
+- First deploy applies the migration `v1` that registers the DO class.
+- Static assets are served from `./dist/client` with SPA fallback.
+
+Key `wrangler.json` entries
+
+```jsonc
+{
+  "main": "./src/worker/index.ts",
+  "durable_objects": {
+    "bindings": [
+      { "class_name": "ExcalidrawWebSocketServer", "name": "DURABLE_OBJECT" },
+    ],
+  },
+  "migrations": [{ "tag": "v1", "new_classes": ["ExcalidrawWebSocketServer"] }],
+  "assets": {
+    "directory": "./dist/client",
+    "not_found_handling": "single-page-application",
+  },
+}
 ```
 
-Monitor your workers:
+## Limitations and next steps
 
-```bash
-npx wrangler tail
-```
+- No authentication or access control (all users can join with a URL)
+- Writes send the full elements array on pointer up; you may want granular diffs/OT/CRDTs
+- No persistence history or versioning; last write wins
+- Basic error handling on sockets; add retries/backoff and analytics
+- Production hardening: rate limiting, payload limits, room limits, and observability
 
-## Additional Resources
+Potential enhancements
 
-- [Cloudflare Workers Documentation](https://developers.cloudflare.com/workers/)
-- [Vite Documentation](https://vitejs.dev/guide/)
-- [React Documentation](https://reactjs.org/)
-- [Hono Documentation](https://hono.dev/)
+- Presence and avatars, names, and colors
+- Element‑level deltas, undo/redo across clients
+- Persist to KV / D1 / R2 depending on needs; snapshot + incremental journal
+- Share links with tokens and permissions
+
+## Acknowledgements
+
+- Built with [Excalidraw](https://github.com/excalidraw/excalidraw), [Hono](https://hono.dev/), and [Cloudflare Workers](https://developers.cloudflare.com/workers/).
+
+## License
+
+This repository does not currently include a license. Consider adding one (e.g., MIT) if you intend others to use or modify this code.
