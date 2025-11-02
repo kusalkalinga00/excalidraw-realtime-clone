@@ -35,15 +35,13 @@ export class ExcalidrawWebSocketServer extends DurableObject {
   async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
     const session = this.sessions.get(ws)!;
 
-    ws.send(
-      `[Durable Object] message: ${message}, from: ${session.id}, to: the initiating client. Total connectionss: ${this.sessions.size}`
-    );
-
-    // this.sessions.forEach((attachment, connectedWs) => {
-    //   connectedWs.send(
-    //     `[Durable Object] message: ${message}, from: ${session.id}, to: all clients. Total connections: ${this.sessions.size}`
-    //   );
-    // });
+    this.sessions.forEach((attachment, connectedWs) => {
+      if (connectedWs !== ws) {
+        connectedWs.send(
+          `[Durable Object] message: ${message}, from: ${session.id}, to: all clients except the initiating client. Total connections: ${this.sessions.size}`
+        );
+      }
+    });
   }
 
   async webSocketClose(

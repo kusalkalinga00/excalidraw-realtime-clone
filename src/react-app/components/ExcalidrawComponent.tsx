@@ -2,21 +2,78 @@ import { Excalidraw } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import useBufferedWebSocket from "../hooks/socket";
 import { useParams } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
+import {
+  ExcalidrawImperativeAPI,
+  SocketId,
+} from "@excalidraw/excalidraw/types";
+import {
+  BufferEventType,
+  ExcalidrawElementChange,
+  PointerEvent,
+} from "../types/event.schema";
 
 const ExcalidrawComponent = () => {
-  const { userId } = useParams({
-    from: "/excalidraw/$userId",
+  const [excalidrawAPI, setExcalidrawAPI] =
+    useState<ExcalidrawImperativeAPI | null>(null);
+  const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
+
+  const { drawId } = useParams({
+    from: "/excalidraw/$drawId",
   });
 
-  const sendEvent = useBufferedWebSocket(userId);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const storedId = localStorage.getItem("userId");
+
+    if (storedId) {
+      setUserId(storedId);
+    } else {
+      const id = Math.random().toString(36).substring(2, 15);
+      localStorage.setItem("userId", id);
+      setUserId(id);
+    }
+  }, []);
+
+  const handleMessage = (event: BufferEventType) => {
+    if (event.type === "pointer") {
+      handlePointerEvent(event);
+    } else if (event.type === "elementChange") {
+      handleElementChangeEvent(event);
+    }
+  };
+
+  const handlePointerEvent = (event: PointerEvent) => {
+    if (excalidrawAPI) {
+      const allCollaborators = excalidrawAPI.getAppState().collaborators;
+      const collaborator = new Map(allCollaborators);
+      collaborator.set(event.data.userId as SocketId, {
+        pointer: {
+          x: event.data.x,
+          y: event.data.y,
+          tool: "laser",
+        },
+      });
+      if (userId) {
+        collaborator.delete(userId as SocketId);
+      }
+      excalidrawAPI.updateScene({ collaborators: collaborator });
+    }
+  };
+
+  const handleElementChangeEvent = (event: ExcalidrawElementChange) => {
+    if (excalidrawAPI) {
+      excalidrawAPI.updateScene({ elements: event.data });
+      console.log("Element change event received:", event);
+    }
+  };
+
+  const sendEventViaSocket = useBufferedWebSocket(drawId, handleMessage);
 
   return (
     <div style={{ height: "100vh", width: "100%" }}>
-      <Excalidraw
-        onPointerUpdate={(payload) => {
-          sendEvent(payload);
-        }}
-      />
+      <Excalidraw onPointerUpdate={(payload) => {}} />
     </div>
   );
 };
