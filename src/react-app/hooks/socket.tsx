@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { BufferEvent, BufferEventType } from "../types/event.schema";
+import { BufferEvent, BufferEventType } from "../../types/event.schema";
 
 const useBufferedWebSocket = (
   id: string,
