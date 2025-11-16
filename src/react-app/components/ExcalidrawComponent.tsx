@@ -1,8 +1,8 @@
-import { Excalidraw, LiveCollaborationTrigger } from "@excalidraw/excalidraw";
+import { Excalidraw } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import useBufferedWebSocket from "../hooks/socket";
 import { useParams } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ExcalidrawImperativeAPI,
   SocketId,
@@ -18,7 +18,6 @@ import {
 const ExcalidrawComponent = () => {
   const [excalidrawAPI, setExcalidrawAPI] =
     useState<ExcalidrawImperativeAPI | null>(null);
-  const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
 
   const { drawId } = useParams({
     from: "/excalidraw/$drawId",

@@ -14,7 +14,7 @@ export class ExcalidrawWebSocketServer extends DurableObject {
     });
   }
 
-  async fetch(request: Request): Promise<Response> {
+  async fetch(): Promise<Response> {
     const webSocketPair = new WebSocketPair();
     const [client, server] = Object.values(webSocketPair);
 
@@ -39,11 +39,11 @@ export class ExcalidrawWebSocketServer extends DurableObject {
     this.broadcastMsg(ws, message);
   }
 
-  webSocketClose(ws: WebSocket) {
+  webSocketClose() {
     console.log("WebSocket closed");
   }
 
-  webSocketError(ws: WebSocket, error: unknown): void | Promise<void> {
+  webSocketError(error: unknown): void | Promise<void> {
     console.log("Error:", error);
   }
 
