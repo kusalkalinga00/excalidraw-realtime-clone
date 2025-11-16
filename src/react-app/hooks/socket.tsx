@@ -9,8 +9,10 @@ const useBufferedWebSocket = (
   const bufferedEvents = useRef<Record<string, BufferEventType>>({});
   const socketRef = useRef<WebSocket | null>(null);
 
+  const apiUrl = import.meta.env.VITE_API;
+
   useEffect(() => {
-    socketRef.current = new WebSocket(`ws://localhost:5173/api/ws/${id}`);
+    socketRef.current = new WebSocket(`wss://${apiUrl}/api/ws/${id}`);
     const socket = socketRef.current;
 
     console.log("useBufferedWebSocket effect", socket);
